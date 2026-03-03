@@ -1,6 +1,10 @@
-# /last30days v2.5
+# /last30days v2.7
 
-**The AI world reinvents itself every month. This skill keeps you current.** /last30days researches your topic across Reddit, X, YouTube, Hacker News, Polymarket, and the web from the last 30 days, finds what the community is actually upvoting, sharing, betting on, and saying on camera, and writes you a grounded narrative with real citations. Whether it's Seedance 2.0 access, paper.design prompts, or the latest Nano Banana Pro techniques, you'll know what people who are paying attention already know.
+**The AI world reinvents itself every month. This skill keeps you current.** /last30days researches your topic across Reddit, X, YouTube, TikTok, Hacker News, Polymarket, and the web from the last 30 days, finds what the community is actually upvoting, sharing, betting on, and saying on camera, and writes you a grounded narrative with real citations. Whether it's Seedance 2.0 access, paper.design prompts, or the latest Nano Banana Pro techniques, you'll know what people who are paying attention already know.
+
+**New in V2.7 — TikTok as a source:**
+
+TikTok is now the 7th signal source. Search any topic and get viral TikTok videos with views, likes, hashtags, and extracted captions — scored and ranked alongside Reddit, X, and YouTube. Powered by [Apify](https://apify.com) with a BYO API key ($5/month free credits, no credit card). [Details below.](#whats-new-in-v27)
 
 **New in V2.5 - dramatically better results:**
 
@@ -27,8 +31,9 @@ git clone https://github.com/mvanhorn/last30days-skill.git ~/.claude/skills/last
 # Add your API keys (optional if signed in to Codex)
 mkdir -p ~/.config/last30days
 cat > ~/.config/last30days/.env << 'EOF'
-OPENAI_API_KEY=sk-...   # optional if using `codex login`
-XAI_API_KEY=xai-...       # optional  - cookie auth is default for X search
+OPENAI_API_KEY=sk-...      # optional if using `codex login`
+XAI_API_KEY=xai-...        # optional - cookie auth is default for X search
+APIFY_API_TOKEN=apify_...  # optional - for TikTok (free $5/mo at apify.com)
 EOF
 chmod 600 ~/.config/last30days/.env
 ```
@@ -124,7 +129,7 @@ Examples:
 
 ## What It Does
 
-1. **Researches** - Scans Reddit, X, YouTube, Hacker News, Polymarket, and the web for discussions from the last 30 days
+1. **Researches** - Scans Reddit, X, YouTube, TikTok, Hacker News, Polymarket, and the web for discussions from the last 30 days
 2. **Synthesizes** - Identifies patterns, best practices, and what actually works
 3. **Delivers** - Either writes copy-paste-ready prompts for your target tool, or gives you a curated expert-level answer
 
@@ -932,6 +937,33 @@ If your OpenAI org doesn't have access to a model (e.g., unverified for gpt-4.1)
 
 ---
 
+## What's New in V2.7
+
+### TikTok as a source
+
+**See what's going viral on TikTok.** Search any topic and get the top TikTok videos with views, likes, hashtags, and extracted captions — scored and ranked alongside all other sources. Cross-source convergence detection catches when the same story trends on TikTok AND Reddit AND X.
+
+Search "Iran Israel" and you get:
+- 🎵 TikTok: 12 videos │ 61,618,200 views │ 2,645,694 likes │ 5 with captions
+- @suaradotcom: 20.1M views — Iranian missiles striking Tel Aviv
+- @itvnews: 14.7M views — Missile getting through Iron Dome
+- @bbcnews: 12.5M views — US and Israel struck Iran, killing Khamenei
+
+Search "Leah Halton" and TikTok is the primary signal:
+- 🎵 TikTok: 15 videos │ 152.6M views │ 10.9M likes │ 5 with captions
+- @looooooooch: 108.8M views — her "Recreation #Inverted" viral hit
+- @allyouseeisai: 17.7M views — AI-generated content of her
+
+**Powered by [Apify](https://apify.com)** — sign up for free ($5/month credits, no credit card) and add your token:
+
+```bash
+echo 'APIFY_API_TOKEN=apify_api_...' >> ~/.config/last30days/.env
+```
+
+The shared Apify client wrapper is designed for future Facebook and Instagram sources using the same token.
+
+---
+
 ## What's New in V2.5
 
 ### Polymarket prediction markets and Hacker News
@@ -955,7 +987,7 @@ No API keys required for either source. Inspired by community PRs from [@ARJ999]
 
 ### Multi-signal quality-ranked relevance scoring
 
-**Every result across all six sources runs through a composite scoring pipeline.** V2.5 doesn't just find more content - it ranks it with significantly higher precision.
+**Every result across all seven sources runs through a composite scoring pipeline.** V2.5 doesn't just find more content - it ranks it with significantly higher precision.
 
 **Text similarity engine** - Bidirectional substring matching with synonym expansion ("hip hop" matches "rap", "MacBook" matches "Mac", "AI video" matches "text to video") and token-level overlap scoring. A rap music mix titled "Lit Hip Hop Mix 2026" went from relevance 0.33 (almost filtered out) to 0.71. Title + transcript matching catches videos that discuss your topic without mentioning it in the title.
 
@@ -1075,6 +1107,7 @@ Thanks to the contributors who helped shape V2:
 | `youtube.com` (via yt-dlp) | Search query | None (public search) |
 | `hn.algolia.com` | Search query | None (public API) |
 | `gamma-api.polymarket.com` | Search query | None (public API) |
+| `api.apify.com` | Search query (TikTok) | APIFY_API_TOKEN |
 | `api.search.brave.com` | Search query (optional) | BRAVE_API_KEY |
 | `api.parallel.ai` | Search query (optional) | PARALLEL_API_KEY |
 | `openrouter.ai` | Search query (optional) | OPENROUTER_API_KEY |
@@ -1093,6 +1126,6 @@ Each API key is transmitted only to its respective endpoint. Your OpenAI key is 
 
 ---
 
-*30 days of research. 30 seconds of work. Six sources. Zero stale prompts.*
+*30 days of research. 30 seconds of work. Seven sources. Zero stale prompts.*
 
-*Pair with [Open Claw](https://github.com/openclaw/openclaw) for automated watchlists and briefings. Reddit. X. YouTube. Web.  - All synthesized into expert answers and copy-paste prompts.*
+*Pair with [Open Claw](https://github.com/openclaw/openclaw) for automated watchlists and briefings. Reddit. X. YouTube. TikTok. Web.  - All synthesized into expert answers and copy-paste prompts.*
