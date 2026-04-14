@@ -109,14 +109,6 @@ def _log(msg: str):
     log.source_log("TikTok", msg)
 
 
-def _sc_headers(token: str) -> Dict[str, str]:
-    """Build ScrapeCreators request headers."""
-    return {
-        "x-api-key": token,
-        "Content-Type": "application/json",
-    }
-
-
 def _parse_date(item: Dict[str, Any]) -> Optional[str]:
     """Parse date from ScrapeCreators TikTok item to YYYY-MM-DD."""
     ts = item.get("create_time")
@@ -227,7 +219,7 @@ def _hashtag_search(
             from urllib.parse import urlencode
             params = urlencode({"hashtag": hashtag})
             url = f"{SCRAPECREATORS_BASE}/search/hashtag?{params}"
-            headers = _sc_headers(token)
+            headers = http.scrapecreators_headers(token)
             headers["User-Agent"] = http.USER_AGENT
             data = http.get(url, headers=headers, timeout=30, retries=2)
         except Exception as e:
@@ -238,7 +230,7 @@ def _hashtag_search(
             resp = _requests.get(
                 f"{SCRAPECREATORS_BASE}/search/hashtag",
                 params={"hashtag": hashtag},
-                headers=_sc_headers(token),
+                headers=http.scrapecreators_headers(token),
                 timeout=30,
             )
             resp.raise_for_status()
@@ -274,7 +266,7 @@ def _profile_videos(
             from urllib.parse import urlencode
             params = urlencode({"handle": handle, "sort_by": "latest"})
             url = f"{profile_url}?{params}"
-            headers = _sc_headers(token)
+            headers = http.scrapecreators_headers(token)
             headers["User-Agent"] = http.USER_AGENT
             data = http.get(url, headers=headers, timeout=30, retries=2)
         except Exception as e:
@@ -285,7 +277,7 @@ def _profile_videos(
             resp = _requests.get(
                 profile_url,
                 params={"handle": handle, "sort_by": "latest"},
-                headers=_sc_headers(token),
+                headers=http.scrapecreators_headers(token),
                 timeout=30,
             )
             resp.raise_for_status()
@@ -332,7 +324,7 @@ def search_tiktok(
             from urllib.parse import urlencode
             params = urlencode({"query": core_topic, "sort_by": "relevance"})
             url = f"{SCRAPECREATORS_BASE}/search/keyword?{params}"
-            headers = _sc_headers(token)
+            headers = http.scrapecreators_headers(token)
             headers["User-Agent"] = http.USER_AGENT
             data = http.get(url, headers=headers, timeout=30, retries=2)
         except Exception as e:
@@ -343,7 +335,7 @@ def search_tiktok(
             resp = _requests.get(
                 f"{SCRAPECREATORS_BASE}/search/keyword",
                 params={"query": core_topic, "sort_by": "relevance"},
-                headers=_sc_headers(token),
+                headers=http.scrapecreators_headers(token),
                 timeout=30,
             )
             resp.raise_for_status()
@@ -433,7 +425,7 @@ def fetch_captions(
             resp = _requests.get(
                 f"{SCRAPECREATORS_BASE}/video/transcript",
                 params={"url": url},
-                headers=_sc_headers(token),
+                headers=http.scrapecreators_headers(token),
                 timeout=15,
             )
             if resp.status_code == 200:

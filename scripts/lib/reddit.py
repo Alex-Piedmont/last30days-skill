@@ -69,14 +69,6 @@ def _log(msg: str):
     log.source_log("Reddit", msg, tty_only=False)
 
 
-def _sc_headers(token: str) -> Dict[str, str]:
-    """Build ScrapeCreators request headers."""
-    return {
-        "x-api-key": token,
-        "Content-Type": "application/json",
-    }
-
-
 def _extract_core_subject(topic: str) -> str:
     """Extract core subject from verbose query.
 
@@ -335,7 +327,7 @@ def _global_search(
     try:
         data = http.get(
             f"{SCRAPECREATORS_BASE}/search",
-            headers=_sc_headers(token),
+            headers=http.scrapecreators_headers(token),
             params={"query": query, "sort": sort, "timeframe": timeframe},
             timeout=30,
             retries=2,
@@ -373,7 +365,7 @@ def _subreddit_search(
     try:
         data = http.get(
             f"{SCRAPECREATORS_BASE}/subreddit/search",
-            headers=_sc_headers(token),
+            headers=http.scrapecreators_headers(token),
             params={
                 "subreddit": subreddit,
                 "query": query,
@@ -405,7 +397,7 @@ def fetch_post_comments(
     try:
         data = http.get(
             f"{SCRAPECREATORS_BASE}/post/comments",
-            headers=_sc_headers(token),
+            headers=http.scrapecreators_headers(token),
             params={"url": url},
             timeout=30,
             retries=2,

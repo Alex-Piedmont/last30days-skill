@@ -28,14 +28,6 @@ def _log(msg: str):
     log.source_log("Threads", msg)
 
 
-def _sc_headers(token: str) -> Dict[str, str]:
-    """Build ScrapeCreators request headers."""
-    return {
-        "x-api-key": token,
-        "Content-Type": "application/json",
-    }
-
-
 def _extract_core_subject(topic: str) -> str:
     """Extract core subject from verbose query for Threads search."""
     from .query import extract_core_subject
@@ -170,7 +162,7 @@ def search_threads(
             from urllib.parse import urlencode
             params = urlencode({"keyword": core_topic})
             url = f"{SCRAPECREATORS_BASE}/search?{params}"
-            headers = _sc_headers(token)
+            headers = http.scrapecreators_headers(token)
             headers["User-Agent"] = http.USER_AGENT
             data = http.get(url, headers=headers, timeout=30, retries=2)
         except Exception as e:
@@ -181,7 +173,7 @@ def search_threads(
             resp = _requests.get(
                 f"{SCRAPECREATORS_BASE}/search",
                 params={"keyword": core_topic},
-                headers=_sc_headers(token),
+                headers=http.scrapecreators_headers(token),
                 timeout=30,
             )
             resp.raise_for_status()

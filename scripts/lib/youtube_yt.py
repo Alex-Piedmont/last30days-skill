@@ -655,14 +655,6 @@ except ImportError:
     _requests = None
 
 
-def _sc_headers(token: str) -> Dict[str, str]:
-    """Build ScrapeCreators request headers."""
-    return {
-        "x-api-key": token,
-        "Content-Type": "application/json",
-    }
-
-
 def _total_engagement(item: Dict[str, Any]) -> int:
     """Combined engagement score for ranking which videos to enrich."""
     eng = item.get("engagement", {})
@@ -745,7 +737,7 @@ def _fetch_video_comments(
             from urllib.parse import urlencode
             params = urlencode({"id": video_id})
             url = f"{SCRAPECREATORS_YT_BASE}/video/comments?{params}"
-            headers = _sc_headers(token)
+            headers = http.scrapecreators_headers(token)
             headers["User-Agent"] = http.USER_AGENT
             data = http.get(url, headers=headers, timeout=30, retries=2)
         except Exception as exc:
@@ -756,7 +748,7 @@ def _fetch_video_comments(
             resp = _requests.get(
                 f"{SCRAPECREATORS_YT_BASE}/video/comments",
                 params={"id": video_id},
-                headers=_sc_headers(token),
+                headers=http.scrapecreators_headers(token),
                 timeout=30,
             )
             resp.raise_for_status()
@@ -906,7 +898,7 @@ def _sc_youtube_search(keyword: str, token: str) -> List[Dict[str, Any]]:
             from urllib.parse import urlencode
             params = urlencode({"keyword": keyword})
             url = f"{SCRAPECREATORS_YT_BASE}/search?{params}"
-            headers = _sc_headers(token)
+            headers = http.scrapecreators_headers(token)
             headers["User-Agent"] = http.USER_AGENT
             data = http.get(url, headers=headers, timeout=30, retries=2)
             return data.get("videos", data.get("data", data.get("items", [])))
@@ -918,7 +910,7 @@ def _sc_youtube_search(keyword: str, token: str) -> List[Dict[str, Any]]:
         resp = _requests.get(
             f"{SCRAPECREATORS_YT_BASE}/search",
             params={"keyword": keyword},
-            headers=_sc_headers(token),
+            headers=http.scrapecreators_headers(token),
             timeout=30,
         )
         resp.raise_for_status()
@@ -944,7 +936,7 @@ def _sc_fetch_transcript(video_id: str, token: str) -> Optional[str]:
             from urllib.parse import urlencode
             params = urlencode({"id": video_id})
             url = f"{SCRAPECREATORS_YT_BASE}/video/transcript?{params}"
-            headers = _sc_headers(token)
+            headers = http.scrapecreators_headers(token)
             headers["User-Agent"] = http.USER_AGENT
             data = http.get(url, headers=headers, timeout=30, retries=2)
         except Exception as exc:
@@ -955,7 +947,7 @@ def _sc_fetch_transcript(video_id: str, token: str) -> Optional[str]:
             resp = _requests.get(
                 f"{SCRAPECREATORS_YT_BASE}/video/transcript",
                 params={"id": video_id},
-                headers=_sc_headers(token),
+                headers=http.scrapecreators_headers(token),
                 timeout=30,
             )
             if resp.status_code != 200:

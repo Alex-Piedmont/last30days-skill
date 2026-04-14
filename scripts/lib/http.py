@@ -166,6 +166,14 @@ def post_raw(url: str, json_data: Dict[str, Any], headers: Optional[Dict[str, st
     return request("POST", url, headers=headers, json_data=json_data, raw=True, **kwargs)
 
 
+def scrapecreators_headers(token: str) -> Dict[str, str]:
+    """Build ScrapeCreators request headers (x-api-key + JSON content type)."""
+    return {
+        "x-api-key": token,
+        "Content-Type": "application/json",
+    }
+
+
 def get_reddit_json(path: str, timeout: int = DEFAULT_TIMEOUT, retries: int = MAX_RETRIES) -> Dict[str, Any]:
     """Fetch Reddit thread JSON.
 
