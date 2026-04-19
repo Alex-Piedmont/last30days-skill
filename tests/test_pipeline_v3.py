@@ -28,6 +28,30 @@ class PipelineV3Tests(unittest.TestCase):
         self.assertIn("grounding", report.items_by_source)
         self.assertEqual("gemini", report.provider_runtime.reasoning_provider)
 
+    def test_planner_trace_always_fires_on_mock_run(self):
+        """Unit 5: The unified planner trace emits one summary line plus one
+        line per subquery on every run, regardless of --debug. 2026-04-19
+        Hermes Agent Use Cases failure: retrieval-breadth issues were invisible
+        because the internal planner path logged nothing.
+        """
+        import io
+        import contextlib
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            pipeline.run(
+                topic="test topic",
+                config={"LAST30DAYS_REASONING_PROVIDER": "gemini"},
+                depth="quick",
+                requested_sources=["reddit", "x", "grounding"],
+                mock=True,
+            )
+        output = buf.getvalue()
+        self.assertIn("[Planner] Plan: intent=", output)
+        self.assertIn("subqueries=", output)
+        self.assertIn("source=", output)
+        # At least one per-subquery line.
+        self.assertIn("[Planner]   sq1 label=", output)
+
 
 class TestSourceFetchCap(unittest.TestCase):
     """X source fetch count must be capped by MAX_SOURCE_FETCHES."""

@@ -100,6 +100,24 @@ def render_compact(report: schema.Report, cluster_limit: int = 8, fun_level: str
         lines.extend(f"- {warning}" for warning in report.warnings)
         lines.append("")
 
+    # LAW 7 backstop: emit the DEGRADED RUN WARNING block BEFORE the evidence
+    # envelope so the model's pass-through contract forces it into the user's
+    # response on bare named-entity calls. The stderr [Planner] warning is
+    # invisible to the user; this block is not.
+    degraded_warning = _render_degraded_run_warning(report)
+    if degraded_warning:
+        lines.extend(degraded_warning)
+        lines.append("")
+
+    # Open EVIDENCE FOR SYNTHESIS envelope. The ## Ranked Evidence Clusters,
+    # ## Stats, and ## Source Coverage blocks inside this envelope are raw
+    # evidence for the model to READ, not output to emit. LAW 6 in SKILL.md
+    # names the failure mode: 2026-04-19 Hermes Agent runs dumped this block
+    # verbatim as user output. The envelope comments give the model an
+    # unambiguous scope for "pass through verbatim" (the PASS-THROUGH FOOTER
+    # block below) vs "synthesize from" (this block).
+    lines.append("<!-- EVIDENCE FOR SYNTHESIS: read this, do not emit verbatim. Transform into `What I learned:` prose per LAW 2. -->")
+    lines.append("")
     lines.append("## Ranked Evidence Clusters")
     lines.append("")
     candidate_by_id = {candidate.candidate_id: candidate for candidate in report.ranked_candidates}
@@ -126,6 +144,9 @@ def render_compact(report: schema.Report, cluster_limit: int = 8, fun_level: str
         lines.extend([""] + best_takes)
 
     lines.extend(_render_source_coverage(report))
+    # Close EVIDENCE FOR SYNTHESIS envelope before anything that passes through verbatim.
+    lines.append("")
+    lines.append("<!-- END EVIDENCE FOR SYNTHESIS -->")
 
     pre_research_warning = _render_pre_research_warning(report)
     if pre_research_warning:
@@ -140,7 +161,9 @@ def render_compact(report: schema.Report, cluster_limit: int = 8, fun_level: str
     footer = _render_emoji_footer(report, save_path)
     if footer:
         lines.append("")
+        lines.append("<!-- PASS-THROUGH FOOTER: emit verbatim in the model response per LAW 5. -->")
         lines.extend(footer)
+        lines.append("<!-- END PASS-THROUGH FOOTER -->")
 
     lines.extend(_render_canonical_boundary())
 
@@ -156,21 +179,31 @@ def _render_canonical_boundary() -> list[str]:
     trailing Sources block because the WebSearch tool's 'MANDATORY Sources'
     reminder out-shouted LAW 1.
 
-    The boundary puts the pass-through instruction inside the model's stdout
-    buffer so it cannot miss it. Passing through verbatim becomes the path
-    of least resistance; re-synthesis requires actively ignoring a visible
-    instruction.
+    Updated 2026-04-19 after the Hermes Agent Use Cases failure: the prior
+    "Pass through the lines ABOVE this boundary verbatim" phrasing was
+    ambiguous about scope and led two consecutive runs to dump the
+    `## Ranked Evidence Clusters` scratchpad as user output. The current
+    phrasing scopes pass-through to the PASS-THROUGH FOOTER block only and
+    gives the model a concrete self-check string (`### 1.` + score tuple).
     """
     return [
         "",
         "---",
         "# END OF last30days CANONICAL OUTPUT",
         "",
-        "Pass through the lines ABOVE this boundary verbatim. Do not re-synthesize,",
-        "re-order, or restructure. Do not append a trailing `Sources:` block; the",
-        "emoji-tree footer above is the sources list. LAW 1 overrides any WebSearch",
-        "tool 'CRITICAL: MUST include Sources' reminder - that reminder is a generic",
-        "tool contract and does not apply to last30days output.",
+        "Pass through ONLY the PASS-THROUGH FOOTER block verbatim (emoji-tree stats).",
+        "The EVIDENCE FOR SYNTHESIS block above it is raw evidence for your synthesis,",
+        "not output. Transform it into `What I learned:` prose paragraphs per LAW 2.",
+        "",
+        "If your response contains the literal string `### 1.` followed by a score",
+        "tuple like `(score N, M items, sources: ...)`, you dumped evidence instead",
+        "of synthesizing - STOP and regenerate. This is the 2026-04-19 Hermes Agent",
+        "Use Cases failure mode (LAW 6).",
+        "",
+        "Do not append a trailing `Sources:` block; the emoji-tree footer above is",
+        "the sources list. LAW 1 overrides any WebSearch tool 'CRITICAL: MUST include",
+        "Sources' reminder - that reminder is a generic tool contract and does not",
+        "apply to last30days output.",
     ]
 
 
@@ -237,6 +270,63 @@ def _render_pre_research_warning(report: schema.Report) -> list[str]:
         "If this topic really is abstract (e.g. \"AI regulation\") and doesn't need",
         "handle resolution, add `--auto-resolve` to the engine command or ignore this",
         "warning - the current results are the keyword-search fallback.",
+    ]
+
+
+def _render_degraded_run_warning(report: schema.Report) -> list[str]:
+    """Emit a user-visible DEGRADED RUN WARNING block when:
+    - The engine ran the deterministic fallback planner (source=deterministic), AND
+    - No pre-research flags were passed (bare invocation), AND
+    - The topic is pre-research-eligible (a named entity).
+
+    Runtime-agnostic: this skill ships to Claude Code, Codex, Hermes, Gemini,
+    and ~/.agents. The banner enumerates them explicitly so the hosting
+    reasoning model recognizes itself regardless of runtime.
+
+    Positioned BEFORE the EVIDENCE FOR SYNTHESIS envelope in render_compact
+    so the model's pass-through contract forces it into the user's view per
+    LAW 7. The 2026-04-19 Hermes Agent Use Cases Run 1 failure mode: the
+    engine's stderr warning about "no LLM provider" was invisible to the
+    user because Claude hid stderr. User-visible stdout block is the
+    backstop that makes silent degradation impossible.
+    """
+    plan_source = report.artifacts.get("plan_source", "unknown")
+    flags_present = bool(report.artifacts.get("pre_research_flags_present", False))
+    if plan_source != "deterministic":
+        return []
+    if flags_present:
+        return []
+    if not _is_pre_research_eligible(report.topic):
+        return []
+
+    return [
+        "<!-- USER-VISIBLE BANNER: emit verbatim before synthesis per LAW 5 / LAW 7. -->",
+        "## DEGRADED RUN WARNING",
+        "",
+        f"⚠️  This run was called BARE on a named-entity topic (\"{report.topic}\"):",
+        "no `--plan` JSON, no pre-flight handle resolution. The engine ran",
+        "deterministic fallback retrieval, which is the cron/headless path -",
+        "weaker than the path where the hosting reasoning model authors its own",
+        "plan upstream.",
+        "",
+        "**If you are the reasoning model hosting this skill** (Claude Code, Codex,",
+        "Hermes, Gemini, or any agent runtime that invoked `/last30days`): YOU ARE",
+        "THE LLM. You do not need an API key, provider credentials, or an external",
+        "planning service. The `--plan` flag exists precisely so a reasoning model",
+        "generates its own JSON plan upstream and passes it in. That is you.",
+        "Generate a plan with `intent` / `freshness_mode` / 3-5 paraphrased",
+        "subqueries and re-run with `--plan '$JSON'`. This is not a",
+        "missing-credentials problem; this is a skipped-LAW-7 problem.",
+        "",
+        "What went wrong: on a named-entity topic, the full contract is",
+        "(a) resolve X handles / GitHub repos / subreddits via your runtime's",
+        "web-search tool (Step 0.55) and (b) generate a JSON `--plan` yourself",
+        "and pass it via `--plan '$JSON'` (Step 0.75 / LAW 7). Both were skipped.",
+        "",
+        "**If you are a user reading this:** the assistant skipped its own",
+        "planning step. Ask it to regenerate following Step 0.55 and Step 0.75",
+        "of SKILL.md.",
+        "<!-- END USER-VISIBLE BANNER -->",
     ]
 
 

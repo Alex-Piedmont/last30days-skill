@@ -204,7 +204,7 @@ def run(
         plan = planner._sanitize_plan(
             external_plan, topic, available, requested_sources, depth,
         )
-        print(f"[Planner] Using external plan ({len(plan.subqueries)} subqueries)", file=sys.stderr)
+        plan_source = "external"
     else:
         plan = planner.plan_query(
             topic=topic,
@@ -215,6 +215,14 @@ def run(
             model=None if mock else runtime.planner_model,
             context=config.get("_auto_resolve_context", ""),
         )
+        # Source labelling: the fallback path annotates notes with "fallback-plan"
+        # or "deterministic-comparison-plan"; anything else came from the LLM.
+        if any("fallback" in note or "deterministic" in note for note in (plan.notes or [])):
+            plan_source = "deterministic"
+        elif not mock and reasoning_provider and runtime.planner_model:
+            plan_source = "llm"
+        else:
+            plan_source = "deterministic"
 
     # Safety net: ensure grounding appears in all subqueries even if the planner
     # omits it. This is redundant when the planner includes grounding via
@@ -224,7 +232,32 @@ def run(
             if "grounding" not in sq.sources:
                 sq.sources.append("grounding")
 
+    # Always-on planner trace. Emits one summary line plus one per subquery
+    # so retrieval-breadth failures like the 2026-04-19 Hermes Agent Use Cases
+    # disaster are visible without --debug. Stderr only; does not leak into
+    # the user-facing stdout synthesis.
+    print(
+        f"[Planner] Plan: intent={plan.intent}, freshness={plan.freshness_mode}, "
+        f"cluster_mode={plan.cluster_mode}, subqueries={len(plan.subqueries)}, "
+        f"source={plan_source}",
+        file=sys.stderr,
+    )
+    if plan.subqueries:
+        for index, sq in enumerate(plan.subqueries, start=1):
+            sources_str = ",".join(sq.sources) if sq.sources else "(none)"
+            print(
+                f"[Planner]   sq{index} label={sq.label} "
+                f'search="{sq.search_query}" sources=[{sources_str}]',
+                file=sys.stderr,
+            )
+    else:
+        print("[Planner]   (no subqueries in plan)", file=sys.stderr)
+
     bundle = schema.RetrievalBundle(artifacts={"grounding": []})
+    # Expose plan_source to the renderer so render_compact can emit the
+    # DEGRADED RUN banner when a named-entity topic was invoked bare
+    # (source=deterministic AND no pre-research flags). LAW 7 backstop.
+    bundle.artifacts["plan_source"] = plan_source
 
     # Project-mode or person-mode GitHub: run once before the main subquery loop
     _github_custom_done = False
