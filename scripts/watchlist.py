@@ -23,6 +23,44 @@ from lib import schema
 
 
 # --- Webhook Delivery Functions ---
+#
+# Security model (read before extending)
+# --------------------------------------
+# `delivery_channel` is a user-supplied URL stored in the watchlist SQLite
+# DB via `store.set_setting()`. The only validation at send time is
+# `channel.startswith("https://")`. That is *intentionally* lax for the
+# current payload: today the body is a single short notification message
+# that contains the topic name and integer counts — no findings content,
+# no excerpts, no tokens, no PII beyond the topic string the user themself
+# typed. Combined with the fact that `delivery_channel` can only be written
+# by the user running the watchlist CLI subcommands on their own machine
+# (there is no LLM- or env-file-driven write path), the SSRF/exfil surface
+# is accepted as negligible for the current feature scope.
+#
+# DO NOT extend `_format_delivery_message()` or `_send_generic_webhook()`
+# to include any of the following without also tightening validation:
+#   - Finding titles, URLs, content snippets, or excerpts.
+#   - Raw pipeline output, transcripts, top comments, or quotes.
+#   - API keys, tokens, config values, or file paths.
+#   - User identity information beyond the topic name already present.
+#
+# If you need to ship any of the above, restructure the validation before
+# merging:
+#   - Add an allowlist of known webhook providers (hooks.slack.com,
+#     discord.com/api/webhooks, teams.microsoft.com/webhook, etc.) and
+#     require an explicit `DELIVERY_CHANNEL_ALLOW_CUSTOM=true` opt-in for
+#     anything else.
+#   - Reject RFC1918 / loopback / 169.254.* destinations after DNS
+#     resolution; consider pinning the resolved IP to mitigate DNS
+#     rebinding.
+#   - Redact anything sensitive server-side; do not rely on the notification
+#     endpoint being trustworthy.
+#
+# See the review history (branch: security/session-hook-eval-and-pat-path)
+# for the decision record — Option 1 with documentation was chosen because
+# the watchlist payload is message-only and the write surface is
+# user-local. Any enrichment of the payload invalidates that premise.
+
 
 def _deliver_findings(topic_name: str, counts: dict) -> None:
     """Send webhook notification if delivery is configured and there are new findings."""
@@ -71,7 +109,13 @@ def _send_slack_webhook(url: str, text: str) -> None:
 
 
 def _send_generic_webhook(url: str, text: str) -> None:
-    """POST JSON payload to generic webhook."""
+    """POST JSON payload to generic webhook.
+
+    The URL is user-supplied and only validated with `startswith("https://")`
+    at the caller. This is safe ONLY because the payload is a short message
+    string with no finding content. If you enrich the payload, read the
+    security model notes at the top of this module before merging.
+    """
     if not requests:
         raise RuntimeError("requests library not available for webhook delivery")
     
