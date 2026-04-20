@@ -277,7 +277,7 @@ Common patterns:
 
 - Always active: Reddit, Hacker News, Polymarket
 - If gh CLI is installed (check `which gh`): add GitHub
-- If AUTH_TOKEN/CT0 or XAI_API_KEY or FROM_BROWSER is set: add X
+- If AUTH_TOKEN/CT0 or XAI_API_KEY is set, OR FROM_BROWSER is set to a non-`off` value (firefox/chrome/safari/auto): add X. Browser cookie extraction is opt-in: `FROM_BROWSER` unset or `off` means no browser jars are read.
 - If yt-dlp is installed (check `which yt-dlp`): add YouTube
 - If SCRAPECREATORS_API_KEY is set and INCLUDE_SOURCES contains tiktok: add TikTok
 - If SCRAPECREATORS_API_KEY is set and INCLUDE_SOURCES contains instagram: add Instagram

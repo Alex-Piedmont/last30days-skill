@@ -183,7 +183,7 @@ class TestWriteSetupConfig:
     """Tests for write_setup_config()."""
 
     def test_creates_new_env_file(self):
-        """Creates .env file with SETUP_COMPLETE and FROM_BROWSER."""
+        """Creates .env file with SETUP_COMPLETE and FROM_BROWSER (default off)."""
         with tempfile.TemporaryDirectory() as tmpdir:
             env_path = Path(tmpdir) / "subdir" / ".env"
 
@@ -193,7 +193,8 @@ class TestWriteSetupConfig:
             assert env_path.exists()
             content = env_path.read_text()
             assert "SETUP_COMPLETE=true" in content
-            assert "FROM_BROWSER=auto" in content
+            # Default is off: browser cookie extraction is opt-in.
+            assert "FROM_BROWSER=off" in content
 
     def test_appends_to_existing_file(self):
         """Appends to existing .env without overwriting keys."""
@@ -208,9 +209,9 @@ class TestWriteSetupConfig:
             # Original keys preserved
             assert "XAI_API_KEY=my-key" in content
             assert "AUTH_TOKEN=tok123" in content
-            # New keys appended
+            # New keys appended with default off.
             assert "SETUP_COMPLETE=true" in content
-            assert "FROM_BROWSER=auto" in content
+            assert "FROM_BROWSER=off" in content
 
     def test_does_not_overwrite_existing_keys(self):
         """If SETUP_COMPLETE or FROM_BROWSER already exist, don't duplicate."""

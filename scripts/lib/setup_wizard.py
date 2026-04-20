@@ -98,8 +98,14 @@ def run_auto_setup(config: Dict[str, Any]) -> Dict[str, Any]:
     return results
 
 
-def write_setup_config(env_path: Path, from_browser: str = "auto") -> bool:
+def write_setup_config(env_path: Path, from_browser: str = "off") -> bool:
     """Write SETUP_COMPLETE and FROM_BROWSER to the .env file.
+
+    Default `from_browser` is ``off`` — browser cookie extraction is opt-in.
+    Callers that found cookies for a specific browser during an interactive
+    setup should pass the browser name explicitly (e.g. ``firefox``). Callers
+    that want the pre-Option-2 behavior of trying every browser silently
+    should pass ``auto``, but that must be the user's explicit choice.
 
     Creates the file and parent directories if needed.
     Appends to existing file without overwriting existing keys.

