@@ -5,12 +5,25 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from lib import schema
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "generate-synthesis-inputs.py"
+
+# The script under test is gitignored (see `.gitignore`) and only exists in
+# developer checkouts that have run the corresponding generator. Skip the
+# whole module when it isn't present — the test still runs in environments
+# where a dev has produced the file locally.
+if not SCRIPT_PATH.exists():
+    pytest.skip(
+        f"{SCRIPT_PATH.name} is not checked in (see .gitignore); "
+        "skipping module because the script is unavailable.",
+        allow_module_level=True,
+    )
 
 
 def load_module():
