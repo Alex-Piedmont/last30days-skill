@@ -196,12 +196,18 @@ class TestPollDeviceAuth:
         result = setup_wizard.poll_device_auth("dc-123", interval=1, timeout=300)
         assert result == "gho_abc123"
 
+    # poll_device_auth() calls time.time() twice during setup (deadline and
+    # last_reminder) plus once per loop iteration for the `while time.time()
+    # < deadline` check. Reminders also call time.time() but only when
+    # `user_code` is truthy; these tests pass the default empty user_code,
+    # so the reminder branch short-circuits.
     @patch("lib.setup_wizard.time")
     @patch("lib.setup_wizard.urlopen")
     def test_timeout_returns_none(self, mock_urlopen, mock_time):
         """Returns None when timeout is exceeded."""
-        # Simulate time passing beyond deadline
-        mock_time.time = MagicMock(side_effect=[0, 301])
+        # setup: deadline = 0 + 300; last_reminder = 0. Loop check returns 301
+        # → 301 < 300 is False, loop never enters, function returns None.
+        mock_time.time = MagicMock(side_effect=[0, 0, 301])
         mock_time.sleep = MagicMock()
 
         result = setup_wizard.poll_device_auth("dc-123", interval=5, timeout=300)
@@ -211,7 +217,9 @@ class TestPollDeviceAuth:
     @patch("lib.setup_wizard.urlopen")
     def test_expired_token_returns_none(self, mock_urlopen, mock_time):
         """Returns None on expired_token error."""
-        mock_time.time = MagicMock(side_effect=[0, 0])
+        # setup (0, 0) + one loop iteration check (0). Loop enters, urlopen
+        # returns expired_token, function returns None without looping again.
+        mock_time.time = MagicMock(side_effect=[0, 0, 0])
         mock_time.sleep = MagicMock()
 
         expired_resp = MagicMock()
@@ -230,7 +238,9 @@ class TestPollDeviceAuth:
         """HTTP 400 during polling continues (authorization pending)."""
         from urllib.error import HTTPError
 
-        mock_time.time = MagicMock(side_effect=[0, 0, 0])
+        # setup (0, 0) + two loop iterations (0, 0). First iter: HTTPError 400
+        # → continue. Second iter: success response → return token.
+        mock_time.time = MagicMock(side_effect=[0, 0, 0, 0])
         mock_time.sleep = MagicMock()
 
         success_resp = MagicMock()

@@ -39,7 +39,33 @@ def temp_db():
 
 @pytest.fixture
 def sample_report():
-    """Create a sample Report with multiple sources including HN and Polymarket."""
+    """Create a sample Report with ranked_candidates (reddit + x) and
+    items_by_source (hackernews + polymarket).
+
+    `findings_from_report` surfaces reddit and x via `ranked_candidates`
+    (post-rerank, higher-quality data) and falls back to `items_by_source`
+    only for hackernews and polymarket. The fixture mirrors that split so
+    that `findings_from_report(sample_report)` returns exactly 4 findings,
+    one per source.
+    """
+    reddit_item = {
+        "item_id": "R1",
+        "source": "reddit",
+        "title": "Test Reddit Post",
+        "body": "Reddit discussion content",
+        "url": "https://reddit.com/r/test/1",
+        "author": "testuser",
+        "snippet": "Reddit snippet",
+    }
+    x_item = {
+        "item_id": "X1",
+        "source": "x",
+        "title": "Test X Post",
+        "body": "X post content",
+        "url": "https://x.com/test/status/1",
+        "author": "xuser",
+        "snippet": "X snippet",
+    }
     return schema.report_from_dict({
         "topic": "Test Topic",
         "range_from": "2026-01-01",
@@ -59,34 +85,49 @@ def sample_report():
             "source_weights": {},
         },
         "clusters": [],
-        "ranked_candidates": [],
+        "ranked_candidates": [
+            {
+                "candidate_id": "C-R1",
+                "item_id": "R1",
+                "source": "reddit",
+                "sources": ["reddit"],
+                "title": reddit_item["title"],
+                "url": reddit_item["url"],
+                "snippet": reddit_item["snippet"],
+                "subquery_labels": ["primary"],
+                "native_ranks": {"primary:reddit": 1},
+                "local_relevance": 0.8,
+                "freshness": 90,
+                "engagement": 50,
+                "source_quality": 1.0,
+                "rrf_score": 0.02,
+                "rerank_score": 80.0,
+                "final_score": 80.0,
+                "source_items": [reddit_item],
+            },
+            {
+                "candidate_id": "C-X1",
+                "item_id": "X1",
+                "source": "x",
+                "sources": ["x"],
+                "title": x_item["title"],
+                "url": x_item["url"],
+                "snippet": x_item["snippet"],
+                "subquery_labels": ["primary"],
+                "native_ranks": {"primary:x": 1},
+                "local_relevance": 0.85,
+                "freshness": 90,
+                "engagement": 75,
+                "source_quality": 1.0,
+                "rrf_score": 0.02,
+                "rerank_score": 85.0,
+                "final_score": 85.0,
+                "source_items": [x_item],
+            },
+        ],
         "items_by_source": {
-            "reddit": [
-                {
-                    "item_id": "R1",
-                    "source": "reddit",
-                    "title": "Test Reddit Post",
-                    "body": "Reddit discussion content",
-                    "url": "https://reddit.com/r/test/1",
-                    "author": "testuser",
-                    "engagement_score": 50.0,
-                    "local_relevance": 0.8,
-                    "snippet": "Reddit snippet",
-                }
-            ],
-            "x": [
-                {
-                    "item_id": "X1",
-                    "source": "x",
-                    "title": "Test X Post",
-                    "body": "X post content",
-                    "url": "https://x.com/test/status/1",
-                    "author": "xuser",
-                    "engagement_score": 75.0,
-                    "local_relevance": 0.85,
-                    "snippet": "X snippet",
-                }
-            ],
+            "reddit": [reddit_item],
+            "x": [x_item],
             "hackernews": [
                 {
                     "item_id": "HN1",
@@ -214,7 +255,18 @@ def test_findings_from_report_handles_empty_sources():
 
 
 def test_findings_from_report_handles_missing_fields():
-    """Test that missing optional fields (author, snippet) are handled gracefully."""
+    """Test that missing optional fields on a ranked candidate are handled
+    gracefully (no author, no snippet, zero engagement).
+    """
+    sparse_item = {
+        "item_id": "R1",
+        "source": "reddit",
+        "title": "Test",
+        "body": "Content",
+        "url": "https://reddit.com/1",
+        "author": None,
+        "snippet": "",
+    }
     report = schema.report_from_dict({
         "topic": "Test",
         "range_from": "2026-01-01",
@@ -234,34 +286,45 @@ def test_findings_from_report_handles_missing_fields():
             "source_weights": {},
         },
         "clusters": [],
-        "ranked_candidates": [],
+        "ranked_candidates": [
+            {
+                "candidate_id": "C-R1",
+                "item_id": "R1",
+                "source": "reddit",
+                "sources": ["reddit"],
+                "title": sparse_item["title"],
+                "url": sparse_item["url"],
+                "snippet": sparse_item["snippet"],
+                "subquery_labels": [],
+                "native_ranks": {},
+                "local_relevance": 0.0,
+                "freshness": 0,
+                "engagement": None,
+                "source_quality": 0.0,
+                "rrf_score": 0.0,
+                "source_items": [sparse_item],
+            },
+        ],
         "items_by_source": {
-            "reddit": [
-                {
-                    "item_id": "R1",
-                    "source": "reddit",
-                    "title": "Test",
-                    "body": "Content",
-                    "url": "https://reddit.com/1",
-                    "author": None,  # Missing author
-                    "engagement_score": None,  # Missing engagement
-                    "local_relevance": None,  # Missing relevance
-                    "snippet": None,  # Missing snippet
-                }
-            ],
+            "reddit": [sparse_item],
         },
         "errors_by_source": {},
         "warnings": [],
     })
-    
+
     findings = store.findings_from_report(report)
     assert len(findings) == 1
-    
     f = findings[0]
-    assert f["author"] == ""
-    assert f["engagement_score"] == 0.0
-    assert f["relevance_score"] == 0.5
-    assert f["summary"] == "Content"  # Falls back to body
+    assert f["source"] == "reddit"
+    assert f["source_url"] == "https://reddit.com/1"
+    assert f["author"] == ""  # None author coerced to empty string
+    assert f["engagement_score"] == 0  # None engagement coerced to 0
+    # Empty snippet + no explanation + zero scores produce an empty summary
+    # and zero relevance — findings_from_report does not fabricate values.
+    assert f["summary"] == ""
+    assert f["relevance_score"] in (0, 0.0)
+    # Body falls back to the SourceItem.body when present.
+    assert f["content"] == "Content"
 
 
 # === Tests for store_findings() ===

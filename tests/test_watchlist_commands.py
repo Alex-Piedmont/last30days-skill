@@ -251,7 +251,37 @@ def test_run_topic_success(mock_subprocess, temp_db):
             "source_weights": {},
         },
         "clusters": [],
-        "ranked_candidates": [],
+        "ranked_candidates": [
+            {
+                "candidate_id": "C-R1",
+                "item_id": "R1",
+                "source": "reddit",
+                "sources": ["reddit"],
+                "title": "Test",
+                "url": "https://reddit.com/1",
+                "snippet": "Snippet",
+                "subquery_labels": ["primary"],
+                "native_ranks": {"primary:reddit": 1},
+                "local_relevance": 0.8,
+                "freshness": 90,
+                "engagement": 50,
+                "source_quality": 1.0,
+                "rrf_score": 0.02,
+                "rerank_score": 80.0,
+                "final_score": 80.0,
+                "source_items": [
+                    {
+                        "item_id": "R1",
+                        "source": "reddit",
+                        "title": "Test",
+                        "body": "Content",
+                        "url": "https://reddit.com/1",
+                        "author": "user",
+                        "snippet": "Snippet",
+                    }
+                ],
+            },
+        ],
         "items_by_source": {
             "reddit": [
                 {
@@ -271,9 +301,9 @@ def test_run_topic_success(mock_subprocess, temp_db):
         "warnings": [],
     })
     mock_subprocess.return_value = mock_result
-    
+
     result = watchlist._run_topic(topic)
-    
+
     assert result["status"] == "completed"
     assert result["new"] == 1
     assert result["topic"] == "Test Topic"
@@ -338,7 +368,37 @@ def test_run_topic_calls_delivery(mock_deliver, mock_subprocess, temp_db):
             "source_weights": {},
         },
         "clusters": [],
-        "ranked_candidates": [],
+        "ranked_candidates": [
+            {
+                "candidate_id": "C-R1",
+                "item_id": "R1",
+                "source": "reddit",
+                "sources": ["reddit"],
+                "title": "Test",
+                "url": "https://reddit.com/1",
+                "snippet": "Snippet",
+                "subquery_labels": ["primary"],
+                "native_ranks": {"primary:reddit": 1},
+                "local_relevance": 0.8,
+                "freshness": 90,
+                "engagement": 50,
+                "source_quality": 1.0,
+                "rrf_score": 0.02,
+                "rerank_score": 80.0,
+                "final_score": 80.0,
+                "source_items": [
+                    {
+                        "item_id": "R1",
+                        "source": "reddit",
+                        "title": "Test",
+                        "body": "Content",
+                        "url": "https://reddit.com/1",
+                        "author": "user",
+                        "snippet": "Snippet",
+                    }
+                ],
+            },
+        ],
         "items_by_source": {
             "reddit": [
                 {
@@ -358,9 +418,9 @@ def test_run_topic_calls_delivery(mock_deliver, mock_subprocess, temp_db):
         "warnings": [],
     })
     mock_subprocess.return_value = mock_result
-    
+
     watchlist._run_topic(topic)
-    
+
     # Verify delivery was called
     assert mock_deliver.called
     call_args = mock_deliver.call_args[0]
