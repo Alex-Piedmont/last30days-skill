@@ -5,6 +5,35 @@ modules and the system openssl CLI (ships with macOS). Zero pip dependencies.
 
 Chrome on macOS uses v10 encryption (AES-128-CBC with Keychain-stored key).
 This is NOT affected by Windows App-Bound Encryption (v20).
+
+Known residual risk — argv key exposure
+---------------------------------------
+The decrypt path invokes ``openssl enc -K <hex_key> ...`` to do AES-128-CBC.
+OpenSSL's CLI only accepts a raw key via ``-K`` on the command line, so for
+the (sub-second) duration of each openssl subprocess the derived AES key is
+visible to other local users via ``ps`` / ``/proc/<pid>/cmdline``. Combined
+with the temporary SQLite copy of ``~/Library/Application Support/Google/
+Chrome/Default/Cookies`` that this module creates under ``tempfile.mkstemp``,
+an attacker with shell access *on the same machine* during that window can
+decrypt the cookie values.
+
+This is accepted as a residual risk because:
+
+- This skill's target user is a single-user laptop (the machine where the
+  user is also signed into Chrome and running Claude Code). In that setting
+  there is no other local user to read argv.
+- Browser cookie extraction is opt-in (``FROM_BROWSER`` default is ``off``);
+  Chrome specifically requires ``FROM_BROWSER=auto`` or ``FROM_BROWSER=
+  chrome`` AND accepting the Keychain prompt.
+- The temp SQLite is removed in a ``finally`` block on every code path.
+
+If you deploy this on a multi-user host (bastion, CI runner, shared dev
+box), prefer ``FROM_BROWSER=firefox`` or ``FROM_BROWSER=safari`` — Firefox's
+cookies.sqlite is unencrypted (so no key material is handled at all) and
+Safari's Cookies.binarycookies is parsed in pure Python with no subprocess.
+Both avoid the argv-visibility window entirely. A pure-Python AES fix here
+would require either a ``cryptography`` pip dependency or a vendored AES
+implementation; see CHANGELOG "Known limitations" for rationale.
 """
 
 import hashlib

@@ -309,16 +309,23 @@ COOKIE_DOMAINS: dict[str, dict[str, Any]] = {
 def extract_browser_credentials(config: dict[str, Any]) -> dict[str, str]:
     """Extract auth cookies from local browsers.
 
-    Default behavior (FROM_BROWSER unset): tries Firefox and Safari only.
-    These read local files silently with no system dialogs.  Chrome is
-    skipped because ``security find-generic-password`` triggers a macOS
-    Keychain prompt that cannot be reliably suppressed.
+    Default behavior (FROM_BROWSER unset or empty): no extraction.
+    Browser cookie extraction is opt-in — it is surfaced by the first-run
+    wizard and written to ``.env`` only after explicit user consent.
 
-    Set ``FROM_BROWSER=auto`` to also try Chrome (accepts the dialog),
-    or ``FROM_BROWSER=off`` to disable extraction entirely.
+    Accepted values:
+      - ``off`` (default): never read browser cookie stores.
+      - ``firefox`` / ``chrome`` / ``safari``: try only the named browser.
+      - ``auto``: try Firefox, Safari, then Chrome (Chrome on macOS triggers
+        a Keychain prompt, which is why ``auto`` is never the default).
+
+    Prior behavior (pre-Option-2): FROM_BROWSER unset silently read Firefox
+    and Safari cookie jars on every pipeline invocation. That was the default
+    silent-extraction path and is now closed; the opt-in must be explicit.
     """
     from_browser = (config.get("FROM_BROWSER") or "").strip().lower()
-    if from_browser == "off":
+    # Default-off: only opt-in values trigger extraction.
+    if from_browser in ("", "off"):
         return {}
     try:
         from . import cookie_extract
@@ -330,8 +337,8 @@ def extract_browser_credentials(config: dict[str, Any]) -> dict[str, str]:
     elif from_browser == "auto":
         browsers = ["firefox", "safari", "chrome"]
     else:
-        # Default: silent browsers only (no Keychain dialog)
-        browsers = ["firefox", "safari"]
+        # Unrecognized value — treat as off rather than silently fall back.
+        return {}
     extracted: dict[str, str] = {}
     for _service, spec in COOKIE_DOMAINS.items():
         if all(config.get(env_key) for env_key in spec["mapping"].values()):

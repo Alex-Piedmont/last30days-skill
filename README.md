@@ -229,6 +229,12 @@ Built with Python 3.12+, yt-dlp, Node.js (vendored Bird client for X search), an
 
 See [CHANGELOG.md](CHANGELOG.md) for version history.
 
+### Security notes
+
+- Browser cookie extraction is opt-in. Set `FROM_BROWSER=auto` (try all) or `FROM_BROWSER=firefox|chrome|safari` in your `.env` to enable the zero-config X/Twitter and Truth Social path; leaving `FROM_BROWSER` unset or `off` disables it entirely.
+- Chrome cookie extraction (macOS) briefly exposes the derived AES key via the `openssl` subprocess argv. This is accepted for the standard single-user laptop deployment. On multi-user hosts (bastions, CI runners, shared dev boxes), prefer `FROM_BROWSER=firefox` or `FROM_BROWSER=safari` — both are handled in-process with no subprocess key handling. See [scripts/lib/chrome_cookies.py](scripts/lib/chrome_cookies.py) for the full rationale.
+- First-run setup uses the GitHub device flow (least-privilege `read:user user:email` scopes with explicit GitHub-side consent). The skill does not read your `gh auth token`.
+
 ## Star History
 
 <a href="https://star-history.com/#mvanhorn/last30days-skill&Date">
