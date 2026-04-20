@@ -239,46 +239,18 @@ def run_openclaw_setup(config: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# PAT auth flow (GitHub token via ScrapeCreators)
-# ---------------------------------------------------------------------------
-
-_PAT_BASE = "https://api.scrapecreators.com/v1/github/pat"
-
-
-def auth_with_pat(github_token: str) -> Optional[Dict[str, Any]]:
-    """Authenticate with ScrapeCreators using a GitHub PAT.
-
-    POSTs the token to the PAT auth endpoint. ScrapeCreators verifies it
-    against GitHub's API, creates/finds the account, and returns an API key.
-
-    Returns:
-        Dict with api_key, github_username, etc. on success, None on failure.
-    """
-    try:
-        req = Request(f"{_PAT_BASE}/auth", data=b"", method="POST")
-        req.add_header("Authorization", f"Bearer {github_token}")
-        with urlopen(req, timeout=15) as resp:
-            data = json.loads(resp.read())
-    except HTTPError as exc:
-        if exc.code == 422:
-            logger.warning("PAT auth: insufficient scope — user needs user:email")
-        else:
-            logger.warning("PAT auth failed: %s", exc)
-        return None
-    except (URLError, OSError) as exc:
-        logger.warning("PAT auth request failed: %s", exc)
-        return None
-
-    if not data.get("api_key"):
-        logger.warning("PAT auth returned no api_key: %s", data)
-        return None
-
-    return data
-
-
-# ---------------------------------------------------------------------------
 # Device auth flow (GitHub OAuth via ScrapeCreators)
 # ---------------------------------------------------------------------------
+#
+# Historical note: this module used to expose a PAT-based auth path
+# (`auth_with_pat`) that shelled out to `gh auth token` and POSTed the
+# resulting GitHub personal access token to ScrapeCreators. That was
+# removed because the PAT endpoint accepted any scope — including the
+# broad `repo, read:org, gist, workflow` scopes a typical `gh auth login`
+# produces — whereas the device flow below requests the least-privilege
+# scopes `read:user user:email`. Sending a high-privilege credential to
+# a third party for what is functionally an identity check is hard to
+# justify; the device flow is the supported path.
 
 _DEVICE_BASE = "https://api.scrapecreators.com/v1/github/device"
 
@@ -484,52 +456,19 @@ def run_full_device_auth(timeout: int = 300) -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Unified GitHub auth: PAT first, device flow fallback
+# GitHub auth entry point (device flow only)
 # ---------------------------------------------------------------------------
 
 
 def run_github_auth(timeout: int = 300) -> Dict[str, Any]:
-    """Try PAT auth via gh CLI, fall back to device flow.
+    """Run the GitHub device-authorization flow.
 
-    1. Check for `gh` CLI
-    2. If found, run `gh auth token` to get a PAT
-    3. POST PAT to ScrapeCreators — if it works, done
-    4. If PAT fails for any reason, fall through to device flow
+    Retained as a thin alias for `run_full_device_auth` so the
+    `last30days setup --github` CLI subcommand and any external callers
+    keep working. The PAT shortcut this function used to attempt first
+    was removed — see the module-level historical note.
 
-    Returns JSON-serializable dict with status, method, and api_key.
+    Returns:
+        JSON-serializable dict with status, method, and api_key.
     """
-    import sys
-
-    # Step 1: Try PAT via gh CLI
-    gh_path = shutil.which("gh")
-    if gh_path:
-        try:
-            result = subprocess.run(
-                ["gh", "auth", "token"],
-                capture_output=True, text=True, timeout=10,
-            )
-            if result.returncode == 0 and result.stdout.strip():
-                token = result.stdout.strip()
-                print("Found gh CLI — trying PAT auth...", file=sys.stderr)
-                pat_result = auth_with_pat(token)
-                if pat_result and pat_result.get("api_key"):
-                    return {
-                        "status": "success",
-                        "method": "pat",
-                        "api_key": pat_result["api_key"],
-                        "github_username": pat_result.get("github_username", ""),
-                    }
-                # PAT failed — might be insufficient scope
-                print(
-                    "PAT auth didn't work (scope or endpoint issue). "
-                    "Falling back to GitHub device flow...",
-                    file=sys.stderr,
-                )
-        except Exception as exc:
-            logger.debug("gh auth token failed: %s", exc)
-
-    # Step 2: Fall back to device flow
-    if not gh_path:
-        print("gh CLI not found — using GitHub device flow...", file=sys.stderr)
-
     return run_full_device_auth(timeout=timeout)

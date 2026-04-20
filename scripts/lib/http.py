@@ -7,7 +7,9 @@ import time
 import urllib.error
 import urllib.request
 from typing import Any, Dict, Optional, Union
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
+
+_ALLOWED_SCHEMES = ("http", "https")
 
 from . import log as _log
 
@@ -66,6 +68,13 @@ def request(
     """
     headers = headers or {}
     headers.setdefault("User-Agent", USER_AGENT)
+
+    # urllib.request.urlopen honors file://, ftp://, etc. by default. Restrict
+    # to http(s) so a malformed/attacker-controlled URL cannot read local files
+    # or pivot through other schemes.
+    scheme = urlparse(url).scheme.lower()
+    if scheme not in _ALLOWED_SCHEMES:
+        raise HTTPError(f"URL scheme must be http or https, got: {scheme or 'none'}")
 
     if params:
         filtered = {k: str(v) for k, v in params.items() if v is not None}

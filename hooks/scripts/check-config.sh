@@ -23,21 +23,27 @@ check_perms() {
   fi
 }
 
-# Load env file into variables for inspection (without exporting)
+# Load env file into variables for inspection (without exporting).
+# Uses `printf -v` for indirect assignment so the value is never evaluated
+# as shell code. A malicious env file (e.g. `FOO="; rm -rf ~"`) is treated
+# as data, not code. Keys are restricted to valid shell identifiers so the
+# target variable name cannot be hijacked either.
 load_env_vars() {
   local file="$1"
-  if [[ -f "$file" ]]; then
-    while IFS='=' read -r key value; do
-      # Skip comments, empty lines
-      [[ "$key" =~ ^[[:space:]]*# ]] && continue
-      [[ -z "$key" ]] && continue
-      key=$(echo "$key" | xargs)
-      value=$(echo "$value" | xargs | sed 's/^["'\''"]//;s/["'\''"]$//')
-      if [[ -n "$key" && -n "$value" ]]; then
-        eval "ENV_${key}=\"${value}\""
-      fi
-    done < "$file"
-  fi
+  if [[ ! -f "$file" ]]; then return; fi
+  local key value
+  while IFS='=' read -r key value; do
+    # Skip comments, empty lines
+    [[ "$key" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "$key" ]] && continue
+    key=$(echo "$key" | xargs)
+    # Reject anything that isn't a valid identifier ([A-Za-z_][A-Za-z0-9_]*).
+    [[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    value=$(echo "$value" | xargs | sed 's/^["'\''"]//;s/["'\''"]$//')
+    if [[ -n "$value" ]]; then
+      printf -v "ENV_${key}" '%s' "$value"
+    fi
+  done < "$file"
 }
 
 # Determine which config file is active
